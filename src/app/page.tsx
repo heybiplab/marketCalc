@@ -54,6 +54,26 @@ interface Item {
 type BaseUnit = "kg" | "litre" | "quintal" | "dozen";
 type MeasuredUnit = "gram" | "kg" | "ml" | "litre" | "piece";
 
+interface Currency {
+  code: string;
+  symbol: string;
+  flag: string;
+  name: string;
+}
+
+const currencies: Currency[] = [
+  { code: "INR", symbol: "₹", flag: "🇮🇳", name: "Indian Rupee" },
+  { code: "USD", symbol: "$", flag: "🇺🇸", name: "US Dollar" },
+  { code: "EUR", symbol: "€", flag: "🇪🇺", name: "Euro" },
+  { code: "GBP", symbol: "£", flag: "🇬🇧", name: "British Pound" },
+  { code: "JPY", symbol: "¥", flag: "🇯🇵", name: "Japanese Yen" },
+  { code: "AUD", symbol: "A$", flag: "🇦🇺", name: "Australian Dollar" },
+  { code: "CAD", symbol: "C$", flag: "🇨🇦", name: "Canadian Dollar" },
+  { code: "SGD", symbol: "S$", flag: "🇸🇬", name: "Singapore Dollar" },
+  { code: "AED", symbol: "د.إ", flag: "🇦🇪", name: "UAE Dirham" },
+  { code: "PKR", symbol: "₨", flag: "🇵🇰", name: "Pakistani Rupee" },
+];
+
 const unitDivisors: Record<BaseUnit, number> = {
   kg: 1000,
   litre: 1000,
@@ -70,6 +90,9 @@ const measuredUnitOptions: Record<BaseUnit, MeasuredUnit[]> = {
 
 export default function MarketCalculator() {
   const [isDark, setIsDark] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(
+    currencies[0]
+  );
   const [items, setItems] = useState<Item[]>([]);
   const [weighedDialogOpen, setWeighedDialogOpen] = useState(false);
   const [mrpDialogOpen, setMrpDialogOpen] = useState(false);
@@ -90,12 +113,20 @@ export default function MarketCalculator() {
     price: "",
   });
 
-  // Load theme from localStorage
+  // Load theme and currency from localStorage
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
     if (savedTheme === "dark") {
       setIsDark(true);
       document.documentElement.classList.add("dark");
+    }
+
+    const savedCurrency = localStorage.getItem("currency");
+    if (savedCurrency) {
+      const currency = currencies.find((c) => c.code === savedCurrency);
+      if (currency) {
+        setSelectedCurrency(currency);
+      }
     }
   }, []);
 
@@ -109,6 +140,14 @@ export default function MarketCalculator() {
     } else {
       document.documentElement.classList.remove("dark");
       localStorage.setItem("theme", "light");
+    }
+  };
+
+  const handleCurrencyChange = (currencyCode: string) => {
+    const currency = currencies.find((c) => c.code === currencyCode);
+    if (currency) {
+      setSelectedCurrency(currency);
+      localStorage.setItem("currency", currencyCode);
     }
   };
 
@@ -151,7 +190,7 @@ export default function MarketCalculator() {
     const newItem: Item = {
       id: Date.now().toString(),
       name: weighedForm.itemName || "Item",
-      details: `${quantity}${weighedForm.measuredUnit} @ ₹${basePrice}/${weighedForm.baseUnit}`,
+      details: `${quantity}${weighedForm.measuredUnit} @ ${selectedCurrency.symbol}${basePrice}/${weighedForm.baseUnit}`,
       price: calculatedPrice,
     };
 
@@ -212,10 +251,10 @@ export default function MarketCalculator() {
       <div className="min-h-screen bg-background text-foreground p-4 flex items-center justify-center">
         <div className="w-full max-w-2xl">
           <Card className="shadow-lg">
-            {/* Header with theme toggle */}
+            {/* Header with theme toggle and currency selector */}
             <CardHeader className="relative pb-4">
-              <div className="flex items-start justify-between">
-                <div>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
                   <CardTitle className="text-3xl font-bold">
                     MarketCalc
                   </CardTitle>
@@ -223,17 +262,37 @@ export default function MarketCalculator() {
                     Easily calculate prices for weighed and fixed-rate items.
                   </CardDescription>
                 </div>
-                <button
-                  onClick={toggleTheme}
-                  className="p-2 rounded-lg hover:bg-muted transition-colors"
-                  aria-label="Toggle theme"
-                >
-                  {isDark ? (
-                    <Sun className="w-5 h-5" />
-                  ) : (
-                    <Moon className="w-5 h-5" />
-                  )}
-                </button>
+                <div className="flex gap-2 items-start">
+                  <Select
+                    value={selectedCurrency.code}
+                    onValueChange={handleCurrencyChange}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currencies.map((currency) => (
+                        <SelectItem key={currency.code} value={currency.code}>
+                          <span className="flex items-center gap-2">
+                            <span>{currency.flag}</span>
+                            <span>{currency.code}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <button
+                    onClick={toggleTheme}
+                    className="p-2 rounded-lg hover:bg-muted transition-colors"
+                    aria-label="Toggle theme"
+                  >
+                    {isDark ? (
+                      <Sun className="w-5 h-5" />
+                    ) : (
+                      <Moon className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
               </div>
             </CardHeader>
 
@@ -243,9 +302,13 @@ export default function MarketCalculator() {
                 <p className="text-sm text-muted-foreground mb-2">
                   Total Amount
                 </p>
-                <p className="text-5xl font-bold font-mono">
-                  ₹{total.toFixed(2)}
-                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-3xl">{selectedCurrency.flag}</span>
+                  <p className="text-5xl font-bold font-mono">
+                    {selectedCurrency.symbol}
+                    {total.toFixed(2)}
+                  </p>
+                </div>
               </div>
 
               {/* Action Buttons */}
@@ -300,7 +363,8 @@ export default function MarketCalculator() {
                               {item.details}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              ₹{item.price.toFixed(2)}
+                              {selectedCurrency.symbol}
+                              {item.price.toFixed(2)}
                             </TableCell>
                             <TableCell>
                               <button
@@ -367,7 +431,9 @@ export default function MarketCalculator() {
                     }
                   />
                 </div>
-                <span className="text-sm text-muted-foreground px-2">per</span>
+                <span className="text-sm text-muted-foreground px-2">
+                  {selectedCurrency.symbol} per
+                </span>
                 <Select
                   value={weighedForm.baseUnit}
                   onValueChange={(value) => {
@@ -440,7 +506,7 @@ export default function MarketCalculator() {
                   Calculated Price
                 </p>
                 <p className="text-2xl font-bold font-mono">
-                  ₹
+                  {selectedCurrency.symbol}
                   {calculateWeighedPrice(
                     Number.parseFloat(weighedForm.basePrice),
                     Number.parseFloat(weighedForm.quantity),
